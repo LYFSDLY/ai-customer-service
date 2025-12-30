@@ -4,7 +4,7 @@ import re
 import time
 import streamlit as st
 import matplotlib.pyplot as plt
-from fuzzywuzzy import fuzz, process
+from rapidfuzz import fuzz, process
 from dashscope import Generation
 from collections import deque
 import os
@@ -1213,3 +1213,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
