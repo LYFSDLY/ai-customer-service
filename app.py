@@ -233,15 +233,17 @@ def find_in_knowledge_base(user_query, knowledge_df):
                         
                         # 2. 模糊匹配
                         if not part_matches:
-                            best_match, score = process.extractOne(
+                            result = process.extractOne(
                                 part,
                                 knowledge_df['问题'].tolist(),
                                 scorer=fuzz.token_set_ratio
                             )
                             
-                            if score >= 50:  # 合并问题的部分匹配可以降低阈值
-                                matched_row = knowledge_df[knowledge_df['问题'] == best_match].iloc[0]
-                                part_matches.append((matched_row['标准回答'], matched_row.get('问题类型', '通用咨询'), score))
+                            if result:
+                                best_match, score, index = result
+                                if score >= 50:  # 合并问题的部分匹配可以降低阈值
+                                    matched_row = knowledge_df.iloc[index]
+                                    part_matches.append((matched_row['标准回答'], matched_row.get('问题类型', '通用咨询'), score))
                         
                         if part_matches:
                             # 选择分数最高的
@@ -302,30 +304,36 @@ def find_in_knowledge_base(user_query, knowledge_df):
         print(f"DEBUG: 检测到技术问题，尝试模糊匹配")
         
         # 只对技术问题进行模糊匹配
-        best_match, score = process.extractOne(
+        # rapidfuzz 返回三个值：(最佳匹配, 分数, 索引)
+        result = process.extractOne(
             user_query,
             knowledge_df['问题'].tolist(),
             scorer=fuzz.token_set_ratio  # 使用token_set_ratio，对词序不敏感
         )
         
-        print(f"DEBUG: 模糊匹配结果: {best_match}")
-        print(f"DEBUG: 匹配分数: {score}")
-        
-        # 对于技术问题，降低阈值到50
-        if score >= 50:  # 降低阈值到50，提高召回率
-            matched_row = knowledge_df[knowledge_df['问题'] == best_match].iloc[0]
+        if result:
+            best_match, score, index = result
+            print(f"DEBUG: 模糊匹配结果: {best_match}")
+            print(f"DEBUG: 匹配分数: {score}")
+            print(f"DEBUG: 匹配索引: {index}")
             
-            # 验证匹配的相关性
-            # 检查匹配到的问题是否也是技术问题
-            matched_is_technical = any(keyword in best_match for keyword in technical_keywords)
-            
-            if matched_is_technical:
-                print(f"DEBUG: 模糊匹配成功，返回知识库答案")
-                return matched_row['标准回答'], matched_row.get('问题类型', '通用咨询')
+            # 对于技术问题，降低阈值到50
+            if score >= 50:  # 降低阈值到50，提高召回率
+                matched_row = knowledge_df.iloc[index]  # 直接使用索引获取行
+                
+                # 验证匹配的相关性
+                # 检查匹配到的问题是否也是技术问题
+                matched_is_technical = any(keyword in best_match for keyword in technical_keywords)
+                
+                if matched_is_technical:
+                    print(f"DEBUG: 模糊匹配成功，返回知识库答案")
+                    return matched_row['标准回答'], matched_row.get('问题类型', '通用咨询')
+                else:
+                    print(f"DEBUG: 匹配到非技术问题，拒绝返回")
             else:
-                print(f"DEBUG: 匹配到非技术问题，拒绝返回")
+                print(f"DEBUG: 模糊匹配分数不足 {score} < 50")
         else:
-            print(f"DEBUG: 模糊匹配分数不足 {score} < 50")
+            print(f"DEBUG: 模糊匹配未找到结果")
     
     # 没有找到匹配
     print(f"DEBUG: 所有匹配方法都失败")
@@ -1213,4 +1221,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
